@@ -1,4 +1,8 @@
-#! /usr/bin/env python
+'''
+작성일 : 2020-09-11
+작성자 : 이권동
+코드 개요 : 인텐트를 CNN으로 학습시켜 문장분류를 하는 코드
+'''
 
 import tensorflow as tf
 import numpy as np
@@ -25,6 +29,10 @@ import json
 
 import time
 
+'''
+    함수 개요 :
+        데이터 전처리를 위한 함수
+'''
 def preprocess():
     # Data Preparation
     # ==================================================
