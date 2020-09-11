@@ -25,60 +25,19 @@ import json
 
 import time
 
-# Parameters
-# ==================================================
-
-# Data loading params
-FLAGS = flags.FLAGS
-
-flags.DEFINE_float("dev_sample_percentage", .2, "Percentage of the training data to use for validation")
-#flags.DEFINE_string("positive_data_file", "./data/rt-polaritydata/rt-polarity.pos", "Data source for the positive data.")
-#flags.DEFINE_string("negative_data_file", "./data/rt-polaritydata/rt-polarity.neg", "Data source for the negative data.")
-
-flags.DEFINE_string("book", "./data/forest/book", "Data source for the book.")
-flags.DEFINE_string("eat", "./data/forest/eat", "Data source for eat.")
-flags.DEFINE_string("enjoy", "./data/forest/enjoy", "Data source for enjoy.")
-flags.DEFINE_string("etc", "./data/forest/etc", "Data source for enjoy.")
-flags.DEFINE_string("facility", "./data/forest/facility", "Data source for facility.")
-
-# Model Hyperparameters
-flags.DEFINE_integer("embedding_dim", 128, "Dimensionality of character embedding (default: 128)")
-flags.DEFINE_list("filter_sizes", [3,4,5], "Comma-separated filter sizes (default: '3,4,5')")
-flags.DEFINE_integer("num_filters", 128, "Number of filters per filter size (default: 128)")
-flags.DEFINE_float("dropout_keep_prob", 0.5, "Dropout keep probability (default: 0.5)")
-flags.DEFINE_float("l2_reg_lambda", 0.0, "L2 regularization lambda (default: 0.0)")
-
-# Training parameters
-flags.DEFINE_integer("batch_size", 64, "Batch Size (default: 64)")
-flags.DEFINE_integer("num_epochs", 200, "Number of training epochs (default: 200)")
-flags.DEFINE_integer("evaluate_every", 100, "Evaluate model on dev set after this many steps (default: 100)")
-flags.DEFINE_integer("checkpoint_every", 100, "Save model after this many steps (default: 100)")
-flags.DEFINE_integer("num_checkpoints", 5, "Number of checkpoints to store (default: 5)")
-# Misc Parameters
-flags.DEFINE_boolean("allow_soft_placement", True, "Allow device soft device placement")
-flags.DEFINE_boolean("log_device_placement", False, "Log placement of ops on devices")
-
-print("\nParameters:")
-for attr, value in sorted(FLAGS.__flags.items()):
-    print("{}={}".format(attr.upper(), value))
-print("")
-
 def preprocess():
     # Data Preparation
     # ==================================================
 
     # Load data
     print("Loading data...")
-    #intent_list = ["./data/rt-polaritydata/rt-polarity.neg.back", "./data/rt-polaritydata/rt-polarity.pos.back"]
-    #intent_list = ["./data/forest/eat", "./data/forest/facility"]
-    #intent_list = ["./data/forest/book", "./data/forest/eat", "./data/forest/enjoy", "./data/forest/etc", "./data/forest/facility"]
-    #intent_list = ["./data/forest/0", "./data/forest/1", "./data/forest/2", "./data/forest/etc", "./data/forest/4"]
     #intent_list = ["./data/forest/only_book/book", "./data/forest/only_book/etc"]
     #intent_list = ["./data/forest/only_eat/eat", "./data/forest/only_eat/etc"]
     #intent_list = ["./data/forest/only_enjoy/enjoy", "./data/forest/only_enjoy/etc"]
     intent_list = ["./data/forest/only_facility/facility", "./data/forest/only_facility/etc"]
     x_text, y = data_helpers.load_data_and_labels(intent_list)
 
+    # 문장 최대 길이
     max_document = open("data/eval/ym", "r")
     sentences = max_document.readlines()
     texts = [data_helpers.clean_str(sentence) for sentence in sentences]
@@ -86,6 +45,7 @@ def preprocess():
 
     del sentences, texts
 
+    # load 사전
     voca_read = open("data/voca/voca", "r")
     vocab = json.load(voca_read)
     voca_read.close()
@@ -101,14 +61,14 @@ def preprocess():
 
     # Split train/test set
     # TODO: This is very crude, should use cross-validation
-    dev_sample_index = -1 * int(FLAGS.dev_sample_percentage * len(y))
+    dev_sample_index = -1 * int(0.8 * len(y))
     x_train, x_dev = x_shuffled[:dev_sample_index], x_shuffled[dev_sample_index:]
     y_train, y_dev = y_shuffled[:dev_sample_index], y_shuffled[dev_sample_index:]
 
     #x_train, x_dev = x_shuffled, x_shuffled[dev_sample_index:]
     #y_train, y_dev = y_shuffled, y_shuffled[dev_sample_index:]
 
-    m = Word2Vec([x.split(" ") for x in x_text], size=FLAGS.embedding_dim)
+    m = Word2Vec([x.split(" ") for x in x_text], size=128)
     embeddings_index = {}
     for i in range(len(m.wv.vocab)):
         word = list(m.wv.vocab)[i]
@@ -116,7 +76,7 @@ def preprocess():
         embeddings_index[word] = coefs
 
     
-    embedding_matrix = np.zeros((len(vocab), FLAGS.embedding_dim))
+    embedding_matrix = np.zeros((len(vocab), 128))
     
     for word, i in vocab.items():
         embedding_vector = embeddings_index.get(word)
@@ -132,6 +92,13 @@ def preprocess():
 
     return x_train, y_train, vocab, x_dev, y_dev, embedding_matrix
 
+'''
+    함수 개요 :
+        recall 을 계산하는 함수
+    매개변수 :
+        y_target = 레이블 값
+        y_pred = 예측한 레이블 값
+'''
 def recall(y_target, y_pred):
     # clip(t, clip_value_min, clip_value_max) : clip_value_min~clip_value_max 이외 가장자리를 깎아 낸다
     # round : 반올림한다
@@ -152,6 +119,13 @@ def recall(y_target, y_pred):
     return recall
 
 
+'''
+    함수 개요 :
+        precision 을 계산하는 함수
+    매개변수 :
+        y_target = 레이블 값
+        y_pred = 예측한 레이블 값
+'''
 def precision(y_target, y_pred):
     # clip(t, clip_value_min, clip_value_max) : clip_value_min~clip_value_max 이외 가장자리를 깎아 낸다
     # round : 반올림한다
@@ -171,7 +145,13 @@ def precision(y_target, y_pred):
     # return a single tensor value
     return precision
 
-
+'''
+    함수 개요 :
+        f1 score 를 계산하는 함수
+    매개변수 :
+        y_target = 레이블 값
+        y_pred = 예측한 레이블 값
+'''
 def f1score(y_target, y_pred):
     _recall = recall(y_target, y_pred)
     _precision = precision(y_target, y_pred)
@@ -181,6 +161,17 @@ def f1score(y_target, y_pred):
     # return a single tensor value
     return _f1score
 
+'''
+    함수 개요 :
+        학습 네트워크 설정
+    매개변수 :
+       max_len = 문장 최대 길이
+       num_class = 레이블 수
+       vocab = 단어 사전
+       embedding_dim = 워드 임베딩 된 벡터 차원 수
+       filter_sizes = 필터 크기
+       embedding_matrix = 워드 임베딩 된 벡터
+'''
 def set_model(max_len, num_class, vocab, embedding_dim, filter_sizes, embedding_matrix):
     sequence_input = Input(shape=(max_len,), dtype='int32')
     
@@ -233,7 +224,7 @@ def main(argv=None):
 
     print(co, len(y_dev), len(y_train))
 
-    model = set_model(x_train.shape[1], y_train.shape[1], vocab, FLAGS.embedding_dim, FLAGS.filter_sizes, embedding_matrix)
+    model = set_model(x_train.shape[1], y_train.shape[1], vocab, 128, FLAGS.filter_sizes, embedding_matrix)
     history = model.fit(
         x_train, y_train,
         epochs=50,

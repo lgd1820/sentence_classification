@@ -1,10 +1,21 @@
+'''
+작성일 : 2020-09-11
+작성자 : 이권동
+코드 개요 : 문장들에 대해서 불필요한 문자를 제거하고 형태소 단위로 분리시키는 코드
+형태소로 분리된 단어는 정수의 키와 매핑되어 voca 라는 단어 사전에 저장
+'''
 from konlpy.tag import Kkma
 from keras.utils import *
 import numpy as np
 import json
 import re
 
-
+'''
+    함수 개요 :
+        문자열을 입력하면 불필요한 문자들을 제거 후 형태소 단위로 분리시키는 함수
+    매개변수 :
+        string = 문자열
+'''
 def clean_str(string):
     string = re.sub(r"[-=+,#/\?:^$.@*\"※~&%ㆍ!』\\‘|\(\)\[\]\<\>`\'…》]", "", string)
     string = re.sub(r"\'s", " \'s", string)
@@ -28,17 +39,19 @@ def clean_str(string):
     #string = '<start> ' + string + ' <end>'
     return string.strip().lower()
 
-
+'''
+    함수 개요 :
+        intent가 저장된 위치의 리스트들을 입력하면 문장별로 끊는 함수
+        clean_str 을 통해 형태소 단위로 분리된 단어를 반환
+    매개변수 :
+        intent_list=인텐트가 저장된 경로 리스트
+'''
 def load_data_and_labels(intent_list):
     """
     Loads MR polarity data from files, splits the data into words and generates labels.
     Returns split sentences and labels.
     """
     # Load data from files
-    #positive_examples = list(open(positive_data_file, "r", encoding='utf-8').readlines())
-    #positive_examples = [s.strip() for s in positive_examples]
-    #negative_examples = list(open(negative_data_file, "r", encoding='utf-8').readlines())
-    #negative_examples = [s.strip() for s in negative_examples]
     examples_list = []
     for il in intent_list:
         example = list(open(il, "r", encoding='utf-8').readlines())
@@ -54,31 +67,17 @@ def load_data_and_labels(intent_list):
         labels.append(label)
     labels = sum(labels, [])
     y = np_utils.to_categorical(labels, len(examples_list))
-    #positive_labels = [[0, 1] for _ in positive_examples]
-    #negative_labels = [[1, 0] for _ in negative_examples]
-    #y = np.concatenate([positive_labels, negative_labels], 0)
     return [x_text, y]
 
-
-def batch_iter(data, batch_size, num_epochs, shuffle=True):
-    """
-    Generates a batch iterator for a dataset.
-    """
-    data = np.array(data)
-    data_size = len(data)
-    num_batches_per_epoch = int((len(data)-1)/batch_size) + 1
-    for epoch in range(num_epochs):
-        # Shuffle the data at each epoch
-        if shuffle:
-            shuffle_indices = np.random.permutation(np.arange(data_size))
-            shuffled_data = data[shuffle_indices]
-        else:
-            shuffled_data = data
-        for batch_num in range(num_batches_per_epoch):
-            start_index = batch_num * batch_size
-            end_index = min((batch_num + 1) * batch_size, data_size)
-            yield shuffled_data[start_index:end_index]
-
+'''
+    함수 개요 :
+        형태소 단위로 분리된 문장을 입력받아 단어 사전에 등록하는 함수
+        만약 사전에 등록되어있으면 단어를 숫자로 변환
+    매개변수 :
+        sentence = 문장
+        max_length = 현재 모든 문장 중 제일 긴 문장의 단어 수
+        voca = 단어 사전
+'''
 def word_map(sentence, max_length, voca):
     word_map_int = []
     for idx in range(max_length):
